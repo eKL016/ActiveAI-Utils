@@ -1,0 +1,19 @@
+version: '3'
+
+name: activeai
+
+services:
+  
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot
+    command: sh -c "certbot certonly --standalone -d ${CERTBOT_DOMAINS} --text --agree-tos --email ${CERTBOT_EMAIL} --server ${CERTBOT_SERVER} --rsa-key-size 4096 --verbose --keep-until-expiring --preferred-challenges=http --cert-name=${CERTBOT_CERTNAME}"
+    entrypoint: ""
+    volumes:
+      - ./nginx/certs:/etc/letsencrypt
+      - ./nginx/ssl-dhparams.pem:/etc/ssl/certs/dhparam.pem
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    environment:
+      - "TERM=xterm"
+    ports:
+      - "80:80"

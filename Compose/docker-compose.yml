@@ -1,0 +1,69 @@
+version: '3'
+
+name: activeai
+
+services:
+  nginx-proxy:
+    image: nginx:latest
+    container_name: nginx-proxy
+    restart: unless-stopped
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/letsencrypt:ro
+      - ./nginx/ssl-dhparams.pem:/etc/ssl/certs/dhparam.pem
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - CERTS_LOCATION=/etc/letsencrypt/live
+    depends_on:
+      - frontend
+      - backend
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot
+    entrypoint: >
+      sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'
+    volumes:
+      - ./nginx/certs:/etc/letsencrypt
+      - ./nginx/ssl-dhparams.pem:/etc/ssl/certs/dhparam.pem
+      - ./nginx/conf.d:/etc/nginx/conf.d
+    environment:
+      - "TERM=xterm"
+    depends_on:
+      - nginx-proxy
+
+  frontend:
+    image: activeai-frontend:latest
+    container_name: frontend
+    environment:
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+
+  backend:
+    image: activeai-backend:latest
+    container_name: backend
+    depends_on:
+      - mongodb
+    restart: on-failure
+    environment:
+      - DB_HOSTNAME=mongodb
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWD=${DB_PASSWD}
+
+  mongodb:
+    image: mongo
+    ports:
+      - "27017"
+    volumes:
+      - ./utils/mongo-seeding.sh:/docker-entrypoint-initdb.d/mongo-seeding.sh:ro  # Mount seeding script      - mongoData:/data/db
+    restart: on-failure
+    environment:
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWD=${DB_PASSWD}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD} 
+
+volumes:
+  mongoData:
